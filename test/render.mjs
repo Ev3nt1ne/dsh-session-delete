@@ -71,6 +71,9 @@ const mod = def.factory((name) => {
 const { SettingsPage, ArchiveSettingsSection } = mod
 assert.ok(typeof SettingsPage === 'function')
 assert.ok(typeof ArchiveSettingsSection === 'function')
+// 测试显式钉住 zh：语言断言不随插件默认 locale（现为 en）漂移。缺省快照字段
+// 一并保留（configStore.set 是整对象替换，不能只传 locale）。
+mod.__configStore.set({ ...mod.__configStore.getSnapshot(), locale: 'zh' })
 
 const h = React.createElement
 

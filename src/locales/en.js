@@ -140,7 +140,7 @@ export default {
   'card.title': 'Archived sessions',
   'card.description': 'Text language and the sidebar delete button',
   'card.locale.label': 'Text language',
-  'card.locale.hint': '"Follow the app" uses the app-wide language setting; Chinese is the built-in default.',
+  'card.locale.hint': '"Follow the app" uses the app-wide language setting.',
   'card.locale.zh': 'Chinese',
   'card.locale.en': 'English',
   'card.locale.auto': 'Follow the app',

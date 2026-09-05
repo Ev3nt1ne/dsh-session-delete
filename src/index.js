@@ -751,7 +751,7 @@ export function apply(ctx, config) {
       import('@deepseek-ai/schemastery')
         .then(({ default: Schema }) => {
           const Config = Schema.object({
-            locale: Schema.union(['zh', 'en', 'auto']).default('zh'),
+            locale: Schema.union(['zh', 'en', 'auto']).default('en'),
             sidebarButton: Schema.boolean().default(false),
           })
           settingsCtx.settings.installSection(ctx, SETTINGS_NAMESPACE, Config, config ?? {}, {
@@ -770,4 +770,4 @@ export function apply(ctx, config) {
 export const SETTINGS_NAMESPACE = 'session-delete'
 
 /** 插件当前生效配置（installSection setSource 维护；无 settings 注入时为默认值）。 */
-export let currentConfig = { locale: 'zh', sidebarButton: false }
+export let currentConfig = { locale: 'en', sidebarButton: false }

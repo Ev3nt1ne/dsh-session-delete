@@ -14,7 +14,8 @@ while its disk log keeps growing — this plugin adds a real delete, with a reco
 ## Fork additions
 
 - **Bilingual UI** (`src/locales/{zh,en}.js`) with a plugin config `locale`:
-  `'zh' | 'en' | 'auto'`. Default stays **`'zh'`** (upstream's language); `'auto'` follows the
+  `'zh' | 'en' | 'auto'`. Default is **`'en'`** (this fork's operator language); Chinese remains
+  fully selectable and is the fallback for missing keys; `'auto'` follows the
   browser language. A missing key falls back to Chinese — never a raw key.
 - **Optional sidebar delete button** — config `sidebarButton` (default **off**). Adds a trash
   button at the sidebar footer with a two-step confirm: first press arms it, a second press within

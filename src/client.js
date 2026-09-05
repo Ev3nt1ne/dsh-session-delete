@@ -9,7 +9,7 @@
  *     · 全部会话 —— 按工作区分组的全量清单，搜索/过滤/批量删除
  *     · 回收站 —— 按名称识别被删会话，多选批量还原 / 彻底删除 / 一键清空
  *   settings.plugin.item  Plugins 设置区本插件配置卡片（提交 2 起存在）：
- *     新增配置 locale（zh/en/auto，默认 zh）、sidebarButton（默认 false）。
+ *     新增配置 locale（zh/en/auto，默认 en）、sidebarButton（默认 false）。
  *   sidebar.footer.action  侧栏底部删除按钮（sidebarButton=true 才注册）：
  *     复用与设置页完全相同的两步确认/删除路径，默认仅可恢复删除。
  *
@@ -342,7 +342,7 @@ window.__ModuleLoader__.load({
       "card.title": "Archived sessions",
       "card.description": "Text language and the sidebar delete button",
       "card.locale.label": "Text language",
-      "card.locale.hint": "\"Follow the app\" uses the app-wide language setting; Chinese is the built-in default.",
+      "card.locale.hint": "\"Follow the app\" uses the app-wide language setting.",
       "card.locale.zh": "Chinese",
       "card.locale.en": "English",
       "card.locale.auto": "Follow the app",
@@ -365,12 +365,12 @@ window.__ModuleLoader__.load({
     const LOCALE_NS = 'session-delete'
 
     // ---------- 插件配置（宿主 settings 命名空间 session-delete） ----------
-    // 配置：locale = 'zh' | 'en' | 'auto'（默认 zh）；sidebarButton boolean = false。
-    // 无 settingsScope（测试/极端环境）时走下方默认值：zh + 关闭，即上游行为。
+    // 配置：locale = 'zh' | 'en' | 'auto'（默认 en）；sidebarButton boolean = false。
+    // 无 settingsScope（测试/极端环境）时走下方默认值：en + 关闭。
     let localeCtx = null // ctx.locale（注入时赋值；缺省时 t 只认显式配置）
     let configScope = null // ctx.settingsScope.bind({ namespace })（注入时绑定）
     const configStore = {
-      snapshot: { locale: 'zh', sidebarButton: false, writable: false, draftLocale: null, draftSidebar: null, saving: false, saveFailed: false, revision: 0 },
+      snapshot: { locale: 'en', sidebarButton: false, writable: false, draftLocale: null, draftSidebar: null, saving: false, saveFailed: false, revision: 0 },
       listeners: new Set(),
       getSnapshot() { return this.snapshot },
       set(next) {
@@ -1535,7 +1535,7 @@ window.__ModuleLoader__.load({
       const state = props?.useSessionDeleteCard ? props.useSessionDeleteCard((s) => s) : configStore.getSnapshot()
       if (state == null) return null
       const writable = state.writable !== false
-      const localeValue = state.draftLocale ?? state.locale ?? 'zh'
+      const localeValue = state.draftLocale ?? state.locale ?? 'en'
       const sidebarChecked = (state.draftSidebar ?? state.sidebarButton) === true
       const dirty = state.draftLocale != null || state.draftSidebar != null
       const saving = state.saving === true
@@ -1751,13 +1751,13 @@ window.__ModuleLoader__.load({
         const s = configScope.getSnapshot()
         const resolved = { ...(s.base ?? {}), ...(s.value ?? {}) }
         configStore.set({
-          locale: resolved.locale ?? 'zh',
+          locale: resolved.locale ?? 'en',
           sidebarButton: resolved.sidebarButton === true,
           writable: s.writable !== false,
           revision: (configStore.getSnapshot().revision ?? 0) + 1,
         })
       } catch {
-        /* scope 契约外：保持默认 zh/关闭 */
+        /* scope 契约外：保持默认 en/关闭 */
       }
     }
 
@@ -1889,7 +1889,14 @@ window.__ModuleLoader__.load({
       try {
         if (configScope) {
           for (const [field, value] of changes) await configScope.set(field, value)
-          configStore.set({ ...configStore.getSnapshot(), draftLocale: null, draftSidebar: null, saving: false })
+          // 写后立即从 scope 回读 resolved 值（scope subscribe 缺失/滞后的双腿保险）；
+          // 若回读结果仍是 undefined/类型不符，则以本次写入值为准就地生效——
+          // 卡片语言绝不能比配置滞后一步。
+          syncConfigFromScope()
+          const st = configStore.getSnapshot()
+          const next = { ...st, draftLocale: null, draftSidebar: null, saving: false }
+          for (const [field, value] of changes) if (typeof st[field] !== typeof value || st[field] === undefined) next[field] = value
+          configStore.set(next)
         } else {
           const next = {}
           for (const [field, value] of changes) next[field] = value
@@ -1915,6 +1922,7 @@ window.__ModuleLoader__.load({
     exports.SessionDeleteConfigCard = SessionDeleteConfigCard
     exports.SidebarTrashAction = SidebarTrashAction
     exports.LOCALES = LOCALES
+    exports.__configStore = configStore // 测试入口：显式钉住语言/读取快照（不属业务面）
     return module.exports
   },
 })
