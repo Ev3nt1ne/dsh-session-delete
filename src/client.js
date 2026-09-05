@@ -1638,6 +1638,110 @@ window.__ModuleLoader__.load({
     }
 
     // =========================================================================
+    // 侧栏底部删除按钮（sidebar.footer.action；仅 config.sidebarButton=true 注册）
+    // =========================================================================
+
+    /** 16px 垃圾桶（与 nav 图标同一 path，currentColor）。 */
+    function TrashIcon() {
+      return h('svg', {
+        width: 16,
+        height: 16,
+        viewBox: '0 0 16 16',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 1.3,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        'aria-hidden': true,
+      }, h('path', { d: 'M2.5 4.2h11M6.3 2.2h3.4M3.8 4.2l.55 8.5a1 1 0 0 0 1 .93h5.3a1 1 0 0 0 1-.93l.55-8.5M6.5 7v4.3M9.5 7v4.3' }))
+    }
+
+    /**
+     * 侧栏底部的删除当前会话入口。
+     *
+     * 与设置页完全同一条删除路径：同一个 ArmDeleteButton 两步确认（第一次点击
+     * 武装，4 秒内再点执行）、同一个 /delete 只读恢复语义（移入回收站）、同一个
+     * 删除后本地清理（refresh + 必要时 startSession 切走）。没有彻底删除入口——
+     * 侧栏按钮永远默认更安全的可恢复动作。
+     */
+    function SidebarTrashAction(props) {
+      const useSessionsHook = props?.useSessions ?? ((selector) => selector(undefined))
+      const currentId = useSessionsHook((s) => s?.current)
+      useLocaleTick()
+      const [armed, setArmed] = useState(false)
+      const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState(null)
+      const wide = props?.wide !== false
+      const [noticeOpen, setNoticeOpen] = useState(false)
+
+      useArmExpire(armed ? 'sidebar' : null, () => setArmed(false))
+      useEffect(() => {
+        if (!notice || notice.kind !== 'ok') return
+        const timer = setTimeout(() => setNotice(null), 6000)
+        return () => clearTimeout(timer)
+      }, [notice?.at])
+
+      async function fire() {
+        if (!currentId || busy) return
+        setArmed(false)
+        setBusy(true)
+        try {
+          const r = await deleteMany([currentId], currentId)
+          if (r.ok > 0) {
+            setNotice({
+              kind: 'ok',
+              title: t('notice.deleteOne.title', { name: currentId }),
+              detail: t('notice.deleteBatch.detail'),
+              at: Date.now(),
+            })
+          } else {
+            setNotice({ kind: 'err', title: t('notice.deleteFailed'), detail: r.message, at: Date.now() })
+          }
+          refreshClientSessionList()
+          setNoticeOpen(true)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' } },
+        [
+          h(
+            'button',
+            {
+              key: 'b',
+              className: 'sd-btn',
+              style: {
+                ...smallBtn,
+                width: '100%',
+                justifyContent: wide === true ? 'flex-start' : 'center',
+                padding: wide === true ? '5px 9px' : '5px 0',
+                border: 'none',
+                borderRadius: 6,
+                background: armed ? T.err : 'transparent',
+                borderColor: armed ? T.err : 'transparent',
+                color: armed ? '#fff' : T.secondary,
+                fontWeight: armed ? 600 : 400,
+                gap: 7,
+              },
+              disabled: busy,
+              title: armed ? t('sidebar.delete.confirmHint') : t('sidebar.delete.hint'),
+              'aria-label': armed ? t('sidebar.delete.confirm') : t('sidebar.delete.name'),
+              onClick: () => (armed ? fire() : setArmed(true)),
+            },
+            [
+              h(TrashIcon, { key: 'i' }),
+              wide === true ? h('span', { key: 'l' }, armed ? t('sidebar.delete.confirm') : t('sidebar.delete.name')) : null,
+            ].filter(Boolean),
+          ),
+          noticeOpen && notice ? h(NoticeBanner, { key: 'n', notice, onClose: () => setNoticeOpen(false) }) : null,
+        ],
+      )
+    }
+
+    // =========================================================================
     // 注册
     // =========================================================================
 
@@ -1746,6 +1850,32 @@ window.__ModuleLoader__.load({
         ),
       )
 
+      // 侧栏底部删除入口：仅在 sidebarButton=true 时真正注册 occupant；
+      // 关闭/离线（无 settingsScope）时不注册任何东西（连隐藏元素也没有）。
+      ctx.effect(() => {
+        let unreg = null
+        const regOrDrop = () => {
+          const want = configStore.getSnapshot().sidebarButton === true
+          if (want && unreg === null) {
+            unreg = ctx.slots.register(
+              { name: 'sidebar.footer.action', id: 'session-delete', order: 100, label: NAV_LABEL },
+              SidebarTrashAction,
+            )
+          } else if (!want && unreg !== null) {
+            unreg()
+            unreg = null
+          }
+        }
+        regOrDrop()
+        const off = configStore.subscribe(regOrDrop)
+        return () => {
+          off()
+          if (unreg) {
+            unreg()
+            unreg = null
+          }
+        }
+      })
     }
 
     /** 卡片「保存」：草稿字段逐个写入 settings scope；无 scope（离线）就地生效。 */
@@ -1783,6 +1913,7 @@ window.__ModuleLoader__.load({
     exports.SettingsPage = SettingsPage
     exports.ArchiveSettingsSection = ArchiveSettingsSection
     exports.SessionDeleteConfigCard = SessionDeleteConfigCard
+    exports.SidebarTrashAction = SidebarTrashAction
     exports.LOCALES = LOCALES
     return module.exports
   },
