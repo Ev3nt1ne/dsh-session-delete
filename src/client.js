@@ -8,6 +8,16 @@
  *       原分组立即可见）+ 单条删除（两步确认）+ 多选批量
  *     · 全部会话 —— 按工作区分组的全量清单，搜索/过滤/批量删除
  *     · 回收站 —— 按名称识别被删会话，多选批量还原 / 彻底删除 / 一键清空
+ *   settings.plugin.item  Plugins 设置区本插件配置卡片（提交 2 起存在）：
+ *     新增配置 locale（zh/en/auto，默认 auto）、sidebarButton（默认 false）。
+ *   sidebar.footer.action  侧栏底部删除按钮（sidebarButton=true 才注册）：
+ *     复用与设置页完全相同的两步确认/删除路径，默认仅可恢复删除。
+ *
+ * 文案：双语目录（zh 默认 / en），key 与 src/locales/*.js 正本一一对应
+ * （test/locales.mjs 断言内嵌副本与正本逐键相等——目录文件在无构建的
+ * 浏览器 bundle 里不可 import，内嵌由测试保证不漂移）。t(key, params)
+ * 读插件配置 locale：zh/en 强制、auto 跟随宿主 locale 服务；缺键回退
+ * 中文，回退仍缺则显示 key。
  *
  * 数据全部来自本机 Host API（/api/session-delete/*）；删除当前打开的会话后
  * 经 workspaces.startSession() 切到同工作区空白会话，UI 不悬空。
@@ -115,6 +125,305 @@ window.__ModuleLoader__.load({
       err: 'var(--dsw-alias-state-error-primary)',
     }
 
+    // =========================================================================
+    // 文案：双语目录 + t()（无第三方 i18n）
+    // =========================================================================
+    /**
+     * 目录正本在 src/locales/zh.js / en.js（宿主半、test/locales.mjs 直接读取）；
+     * 本文件是浏览器 bundle 的一部分（__ModuleLoader__ 单文件工厂，无法 import
+     * 包内其他文件），所以内嵌同一主题副本。两处的一致性由 test/locales.mjs
+     * 断言（逐键深度相等），不依赖任何构建步骤。
+     */
+    const LOCALES = {
+      zh: {
+      "nav.archived": "归档会话",
+      "tab.archived": "归档会话",
+      "tab.all": "全部会话",
+      "tab.trash": "回收站",
+      "common.close": "关闭",
+      "common.reload": "重新加载",
+      "common.loading": "加载中…",
+      "common.retry": "重试",
+      "common.untitled": "未命名",
+      "common.noWorkspace": "(无目录)",
+      "tag.running": "运行中",
+      "tag.open": "打开中",
+      "tag.subagent": "子代理",
+      "time.justNow": "刚刚",
+      "time.minutesAgo": "{count} 分钟前",
+      "time.hoursAgo": "{count} 小时前",
+      "time.daysAgo": "{count} 天前",
+      "delete.label": "删除",
+      "delete.confirm": "确认删除（入回收站，可还原）",
+      "delete.hint": "删除后移入回收站并保持侧栏隐藏，可在「回收站」页签还原",
+      "delete.selected": "删除所选 ({count})",
+      "delete.confirmSelected": "确认删除 ({count})（入回收站，可还原）",
+      "delete.selectedHint": "删除后移入回收站，可在「回收站」页签还原",
+      "purge.label": "彻底删除",
+      "purge.confirm": "确认彻底删除（不可恢复）",
+      "purge.selected": "彻底删除所选 ({count})",
+      "purge.confirmSelected": "确认彻底删除 ({count})（不可恢复）",
+      "purge.empty": "清空回收站",
+      "purge.confirmEmpty": "确认清空（不可恢复）",
+      "restore.label": "还原",
+      "restore.selected": "还原所选 ({count})",
+      "restore.selectedHint": "还原所选：文件归位并解除归档",
+      "restore.rowHint": "解除归档：会话立即回到侧栏原分组",
+      "restore.selectedUnarchHint": "解除所选会话的归档：侧栏原分组立即可见",
+      "footer.progress": "处理中",
+      "footer.progressDelete": "删除中",
+      "footer.progressRestore": "还原中",
+      "footer.progressPurge": "彻底删除中",
+      "footer.selectedCount": "已选 {count} 项 · {size}",
+      "footer.countSize": "{count} 项 · {size}",
+      "footer.selectAll": "全选 ({count})",
+      "footer.deselectAll": "取消全选",
+      "footer.selectAllHint": "选中当前列表的全部会话（跟随过滤与搜索）",
+      "footer.selectAllHintOff": "取消选择当前列表的全部会话",
+      "footer.clear": "清除",
+      "notice.deleteOne.title": "已删除「{name}」",
+      "notice.deleteOne.detail": "已移入回收站（{size}）· 侧栏已隐藏 · 可在「回收站」页签还原",
+      "notice.deleteBatch.title": "已删除 {count} 个会话 · 释放 {size}",
+      "notice.deleteBatch.detail": "已移入回收站 · 侧栏已隐藏 · 可在「回收站」页签还原",
+      "notice.deleteFailed": "删除失败",
+      "notice.deletePartial.title": "已删除 {ok} 个 · {failed} 个失败",
+      "notice.deletePartial.detail": "成功部分已入回收站；首条失败：{message}",
+      "notice.deleteAllFailed": "全部删除失败（{count} 个）",
+      "notice.restoreOne.title": "已还原「{name}」",
+      "notice.restoreOk.title": "已还原（{id}）",
+      "notice.restoreOk.detail": "已解除归档 · 侧栏原分组立即可见",
+      "notice.restoreFailed": "还原失败",
+      "notice.restoreBatch.title": "已还原 {count} 个会话",
+      "notice.restoreBatchItems.title": "已还原 {count} 项",
+      "notice.restoreBatchPartial.title": "已还原 {ok} 项 · {failed} 项失败",
+      "notice.restoreAndUnarchiveBatch.title": "已还原 {ok} 个 · {failed} 个失败",
+      "notice.restoreBatchAllFailed": "全部还原失败（{count} 项）",
+      "notice.firstFailure": "首条失败：{message}",
+      "notice.stillArchived.title": "文件已还原（{id}）",
+      "notice.stillArchived.detail": "当前 DSH 版本无法在线解除归档；彻底找回见 README 的 unhide 步骤",
+      "notice.stillArchived.altDetail": "文件已归位；解除归档见「归档会话」页签",
+      "notice.purgeOne.title": "已彻底删除 1 项",
+      "notice.purgeOne.detail": "回收站中已不可恢复",
+      "notice.purgeFailed": "彻底删除失败",
+      "notice.purgeBatch.title": "已彻底删除 {count} 项",
+      "notice.purgeBatchPartial.title": "已彻底删除 {ok} 项 · {failed} 项失败",
+      "notice.purgeBatchAllFailed": "全部彻底删除失败（{count} 项）",
+      "notice.purgeAll.title": "已清空回收站（{count} 项）",
+      "notice.purgeAllFailed": "清空失败",
+      "toolbar.searchPlaceholder": "搜索标题 / id",
+      "filter.active": "未归档",
+      "filter.stale30": "30 天未动",
+      "filter.archived": "已归档",
+      "filter.all": "全部",
+      "filter.matchCount": "{shown} / {total}",
+      "toolbar.archivedSummary": "{count} 个已归档会话 · 共 {size}；删除后进入回收站，可还原或彻底删除。",
+      "toolbar.unarchHint": "点击行内「还原」或勾选后批量还原：会话立即回到侧栏原分组，无需重启。",
+      "toolbar.unarchUnavailable": "当前 DSH 版本不支持在线解除归档；如需找回，见 README 的 unhide 步骤。",
+      "toolbar.keepHidden": "删除后会话保持归档隐藏，不会回到侧栏；归档标记在下次重启 DSH 时彻底清理，回收站还原则立即恢复显示。",
+      "empty.archived": "没有已归档的会话。",
+      "empty.archivedHint": "在侧栏会话上右键「归档会话」后，可在此处真正删除其磁盘记录。",
+      "empty.list": "没有可列出的会话",
+      "empty.filtered": "当前过滤条件下没有会话",
+      "empty.trash": "回收站为空",
+      "group.countSize": "{count} 会话 · {size}",
+      "error.title": "「归档会话」页渲染失败",
+      "card.title": "归档会话",
+      "card.description": "配置文案语言与侧栏删除按钮",
+      "card.locale.label": "文案语言",
+      "card.locale.hint": "「中文」与「English」之外的选项跟随应用语言设置。",
+      "card.locale.zh": "中文",
+      "card.locale.en": "English",
+      "card.locale.auto": "跟随应用",
+      "card.sidebarButton.label": "在侧栏底部显示删除按钮",
+      "card.sidebarButton.hint": "点击后仍走两步确认；默认只做可恢复删除（进回收站）。",
+      "card.save": "保存",
+      "card.saving": "保存中",
+      "card.discard": "放弃修改",
+      "card.unsaved": "未保存",
+      "card.readOnly": "只读：此部署不允许在页面上修改插件配置",
+      "card.saveFailed": "保存失败",
+      "sidebar.delete.name": "删除当前会话",
+      "sidebar.delete.hint": "删除当前打开的会话（移入回收站，可在「回收站」页签还原）",
+      "sidebar.delete.confirm": "确认删除？",
+      "sidebar.delete.confirmHint": "移入回收站，可还原",
+      },
+      en: {
+      "nav.archived": "Archived sessions",
+      "tab.archived": "Archived sessions",
+      "tab.all": "All sessions",
+      "tab.trash": "Recycle Bin",
+      "common.close": "Close",
+      "common.reload": "Reload",
+      "common.loading": "Loading…",
+      "common.retry": "Retry",
+      "common.untitled": "Untitled",
+      "common.noWorkspace": "(no workspace)",
+      "tag.running": "Running",
+      "tag.open": "Open",
+      "tag.subagent": "Subagent",
+      "time.justNow": "just now",
+      "time.minutesAgo": "{count} minutes ago",
+      "time.hoursAgo": "{count} hours ago",
+      "time.daysAgo": "{count} days ago",
+      "delete.label": "Delete (to Recycle Bin)",
+      "delete.confirm": "Confirm: delete to Recycle Bin (recoverable)",
+      "delete.hint": "Moves the session to the Recycle Bin and keeps it hidden; you can restore it from the Recycle Bin tab",
+      "delete.selected": "Delete selected ({count})",
+      "delete.confirmSelected": "Confirm: delete {count} selected (to Recycle Bin, recoverable)",
+      "delete.selectedHint": "Moves the selected sessions to the Recycle Bin; you can restore them from the Recycle Bin tab",
+      "purge.label": "Permanently delete — cannot be undone",
+      "purge.confirm": "Confirm: permanently delete this item — CANNOT be undone",
+      "purge.selected": "Permanently delete selected ({count})",
+      "purge.confirmSelected": "Confirm: permanently delete {count} selected — CANNOT be undone",
+      "purge.empty": "Empty the Recycle Bin (permanently)",
+      "purge.confirmEmpty": "Confirm: empty the Recycle Bin — cannot be undone",
+      "restore.label": "Restore",
+      "restore.selected": "Restore selected ({count})",
+      "restore.selectedHint": "Restore the selected items in place and unarchive them",
+      "restore.rowHint": "Unarchive: the session returns to its original sidebar group immediately",
+      "restore.selectedUnarchHint": "Unarchive the selected sessions; they reappear in their original sidebar groups immediately",
+      "footer.progress": "Working",
+      "footer.progressDelete": "Deleting",
+      "footer.progressRestore": "Restoring",
+      "footer.progressPurge": "Permanently deleting",
+      "footer.selectedCount": "{count} selected · {size}",
+      "footer.countSize": "{count} items · {size}",
+      "footer.selectAll": "Select all ({count})",
+      "footer.deselectAll": "Deselect all",
+      "footer.selectAllHint": "Select every session in this list (follows the current filter and search)",
+      "footer.selectAllHintOff": "Deselect every session in this list",
+      "footer.clear": "Clear",
+      "notice.deleteOne.title": "Moved to Recycle Bin: {name}",
+      "notice.deleteOne.detail": "Moved to the Recycle Bin ({size}); hidden from the sidebar; restore it from the Recycle Bin tab",
+      "notice.deleteBatch.title": "Deleted {count} sessions · freed {size}",
+      "notice.deleteBatch.detail": "Moved to the Recycle Bin; hidden from the sidebar; restore them from the Recycle Bin tab",
+      "notice.deleteFailed": "Delete failed",
+      "notice.deletePartial.title": "Deleted {ok} · {failed} failed",
+      "notice.deletePartial.detail": "The recoverable copies are in the Recycle Bin; first failure: {message}",
+      "notice.deleteAllFailed": "All {count} deletions failed",
+      "notice.restoreOne.title": "Restored: {name}",
+      "notice.restoreOk.title": "Restored ({id})",
+      "notice.restoreOk.detail": "Unarchived; visible again in its original sidebar group",
+      "notice.restoreFailed": "Restore failed",
+      "notice.restoreBatch.title": "Restored {count} sessions",
+      "notice.restoreBatchItems.title": "Restored {count} items",
+      "notice.restoreBatchPartial.title": "Restored {ok} items · {failed} failed",
+      "notice.restoreAndUnarchiveBatch.title": "Restored {ok} · {failed} failed",
+      "notice.restoreBatchAllFailed": "All {count} restores failed",
+      "notice.firstFailure": "First failure: {message}",
+      "notice.stillArchived.title": "Files restored ({id})",
+      "notice.stillArchived.detail": "The files are back, but this DSH version cannot unarchive sessions online; the session stays archived — to fully recover it, follow the README unhide steps",
+      "notice.stillArchived.altDetail": "The files are back in place; to unarchive them, see the Archived sessions tab",
+      "notice.purgeOne.title": "Permanently deleted 1 item — cannot be undone",
+      "notice.purgeOne.detail": "Gone; it cannot be restored from the Recycle Bin",
+      "notice.purgeFailed": "Permanent delete failed",
+      "notice.purgeBatch.title": "Permanently deleted {count} items — cannot be undone",
+      "notice.purgeBatchPartial.title": "Permanently deleted {ok} items · {failed} failed",
+      "notice.purgeBatchAllFailed": "All {count} permanent deletions failed",
+      "notice.purgeAll.title": "Emptied the Recycle Bin ({count} items) — gone for good",
+      "notice.purgeAllFailed": "Emptying the Recycle Bin failed",
+      "toolbar.searchPlaceholder": "Search title / id",
+      "filter.active": "Not archived",
+      "filter.stale30": "Untouched for 30 days",
+      "filter.archived": "Archived",
+      "filter.all": "All",
+      "filter.matchCount": "{shown} / {total}",
+      "toolbar.archivedSummary": "{count} archived session(s) · {size} in total; deleting moves them to the Recycle Bin (recoverable) or permanently destroys them.",
+      "toolbar.unarchHint": "Click Restore on a row, or tick rows and Restore selected: the sessions return to their original sidebar groups immediately, no restart needed.",
+      "toolbar.unarchUnavailable": "This DSH version cannot unarchive sessions online; to recover one, follow the README unhide steps.",
+      "toolbar.keepHidden": "Deleted sessions stay archived-hidden and never reappear in the sidebar; the archived flag is cleaned up for good at the next DSH restart, while restoring from the Recycle Bin makes the session visible again immediately.",
+      "empty.archived": "No archived sessions.",
+      "empty.archivedHint": "After you archive a session from the sidebar, you can really delete its on-disk records here.",
+      "empty.list": "No sessions to list",
+      "empty.filtered": "No sessions match the current filter",
+      "empty.trash": "The Recycle Bin is empty",
+      "group.countSize": "{count} sessions · {size}",
+      "error.title": "Settings page \"Archived sessions\" failed to render",
+      "card.title": "Archived sessions",
+      "card.description": "Text language and the sidebar delete button",
+      "card.locale.label": "Text language",
+      "card.locale.hint": "\"Follow the app\" uses the app-wide language setting.",
+      "card.locale.zh": "Chinese",
+      "card.locale.en": "English",
+      "card.locale.auto": "Follow the app",
+      "card.sidebarButton.label": "Show a delete button at the sidebar foot",
+      "card.sidebarButton.hint": "The button still asks for a two-step confirmation and defaults to the recoverable (Recycle Bin) action.",
+      "card.save": "Save",
+      "card.saving": "Saving",
+      "card.discard": "Discard changes",
+      "card.unsaved": "Unsaved",
+      "card.readOnly": "Read-only: this deployment does not allow editing plugin configuration here",
+      "card.saveFailed": "Save failed",
+      "sidebar.delete.name": "Delete current session",
+      "sidebar.delete.hint": "Delete the currently open session (moves it to the Recycle Bin; restore it from the Recycle Bin tab)",
+      "sidebar.delete.confirm": "Confirm delete?",
+      "sidebar.delete.confirmHint": "Moves to the Recycle Bin, recoverable",
+      },
+    }
+
+    /** 宿主/客户端共享的 locale namespace（注册进 ctx.locale 回退链）。 */
+    const LOCALE_NS = 'session-delete'
+
+    // ---------- 插件配置（宿主 settings 命名空间 session-delete） ----------
+    // 配置：locale = 'zh' | 'en' | 'auto'（默认 auto）；sidebarButton boolean = false。
+    // 无 settingsScope（测试/极端环境）时走下方默认值：en + 关闭。
+    let localeCtx = null // ctx.locale（注入时赋值；缺省时 t 只认显式配置）
+    let configScope = null // ctx.settingsScope.bind({ namespace })（注入时绑定）
+    const configStore = {
+      snapshot: { locale: 'en', sidebarButton: false, writable: false, draftLocale: null, draftSidebar: null, saving: false, saveFailed: false, revision: 0 },
+      listeners: new Set(),
+      getSnapshot() { return this.snapshot },
+      set(next) {
+        if (next === this.snapshot) return
+        this.snapshot = next
+        for (const fn of this.listeners) fn()
+      },
+      subscribe(fn) {
+        this.listeners.add(fn)
+        return () => this.listeners.delete(fn)
+      },
+    }
+
+    /** 解析生效语言：强制 zh/en，auto 跟随宿主 locale 快照（未知/缺省回退 zh）。 */
+    function activeLocale() {
+      const pref = configStore.getSnapshot().locale
+      if (pref === 'en') return 'en'
+      if (pref === 'auto') {
+        let id = null
+        try { id = localeCtx?.getLocale?.().active ?? null } catch {}
+        return id === 'en' ? 'en' : 'zh'
+      }
+      return 'zh'
+    }
+
+    /** 模板插值：{name} 形式的占位符，缺参时保留原样（便于发现问题）。 */
+    function formatParams(str, params) {
+      if (!params) return str
+      return str.replace(/\{(\w+)\}/g, (m, k) => (params[k] === undefined ? m : String(params[k])))
+    }
+
+    /**
+     * 取文案：所处语言缺键回退中文，中文仍缺显示 key（防裸 key 抖给用户——
+     * zh/en 键集合一致时理论上不会走到）。
+     */
+    function t(key, params) {
+      const dict = LOCALES[activeLocale()] ?? LOCALES.zh
+      const template = dict[key] ?? LOCALES.zh[key]
+      if (template === undefined) return key
+      return formatParams(template, params)
+    }
+
+    /** 语言的 hook 反应性：config 快照或宿主 locale 变化时重渲染。 */
+    function useLocaleTick() {
+      const [, setTick] = useState(0)
+      useEffect(() => {
+        const bump = () => setTick((n) => n + 1)
+        const offs = [configStore.subscribe(bump)]
+        if (localeCtx && typeof localeCtx.subscribe === 'function') offs.push(localeCtx.subscribe(bump))
+        return () => { for (const off of offs) off() }
+      }, [])
+    }
+
     // ---------- workspaces 客户端服务（apply 时注入） ----------
     let workspacesService = null
     // 插件 client ctx（apply 时记录）：用于删除/还原后刷新宿主会话列表 store。
@@ -190,12 +499,12 @@ window.__ModuleLoader__.load({
     function fmtAgo(ms) {
       if (!ms) return '—'
       const s = Math.floor((Date.now() - ms) / 1000)
-      if (s < 60) return '刚刚'
+      if (s < 60) return t('time.justNow')
       const m = Math.floor(s / 60)
-      if (m < 60) return `${m} 分钟前`
+      if (m < 60) return t('time.minutesAgo', { count: m })
       const hh = Math.floor(m / 60)
-      if (hh < 48) return `${hh} 小时前`
-      return `${Math.floor(hh / 24)} 天前`
+      if (hh < 48) return t('time.hoursAgo', { count: hh })
+      return t('time.daysAgo', { count: Math.floor(hh / 24) })
     }
     function fmtDate(ms) {
       if (!ms) return '—'
@@ -287,7 +596,8 @@ window.__ModuleLoader__.load({
               key: 'x',
               className: 'sd-btn',
               onClick: onClose,
-              title: '关闭',
+              title: t('common.close'),
+              'aria-label': t('common.close'),
               style: { border: 'none', background: 'transparent', color: T.secondary, cursor: 'pointer', padding: '0 2px', fontSize: 12, lineHeight: '18px', flexShrink: 0 },
             },
             '✕',
@@ -296,8 +606,21 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** 单条两步确认删除按钮：第一次点击武装（变红），4 秒内再点执行。 */
-    function ArmDeleteButton({ armed, onArm, onFire, busy, label = '删除', hint }) {
+    /** 4 秒未确认自动解除武装（单条两步确认与侧栏按钮共用同一时间窗）。 */
+    function useArmExpire(key, release) {
+      useEffect(() => {
+        if (key === null) return
+        const timer = setTimeout(release, 4000)
+        return () => clearTimeout(timer)
+      }, [key])
+    }
+
+    /**
+     * 单条两步确认删除按钮：第一次点击武装（变红），4 秒内再点执行。
+     * armed/label 均由调用方传入文案——恢复删除与彻底删除在此层面就分岔，
+     * 武器态文案绝不允许两种动作共用一个词。
+     */
+    function ArmDeleteButton({ armed, onArm, onFire, busy, label, armedLabel, hint }) {
       return h(
         'button',
         {
@@ -313,7 +636,7 @@ window.__ModuleLoader__.load({
           title: hint,
           onClick: armed ? onFire : onArm,
         },
-        armed ? '确认删除' : label,
+        armed ? armedLabel : label,
       )
     }
 
@@ -322,6 +645,8 @@ window.__ModuleLoader__.load({
     // =========================================================================
     function SettingsPage(props) {
       const currentId = props?.currentId
+
+      useLocaleTick()
 
       // 可选 initial* 用于测试注入（生产恒为 undefined → 走 fetch 加载），
       // 让渲染测试能确定性覆盖「有数据」的分支（页脚/行/分组头等）。
@@ -395,14 +720,7 @@ window.__ModuleLoader__.load({
       }, [tab])
 
       // 4 秒未确认自动解除武装
-      useEffect(() => {
-        if (arm === null && !purgeAllArmed) return
-        const t = setTimeout(() => {
-          setArm(null)
-          setPurgeAllArmed(false)
-        }, 4000)
-        return () => clearTimeout(t)
-      }, [arm, purgeAllArmed])
+      useArmExpire(`${arm ?? ''}|${purgeAllArmed ? 'p' : ''}`, () => { setArm(null); setPurgeAllArmed(false) })
 
       // ---------- 动作 ----------
       /** 删除成功后本地移除对应行，并同步回收站状态（页签徽标即时反映新删条目）。 */
@@ -435,12 +753,12 @@ window.__ModuleLoader__.load({
           if (r.ok > 0) {
             setNotice({
               kind: 'ok',
-              title: `已删除「${title || shortId(id)}」`,
-              detail: `已移入回收站（${fmtSize(freedOf(r.okIds))}）· 侧栏已隐藏 · 可在「回收站」页签还原`,
+              title: t('notice.deleteOne.title', { name: title || shortId(id) }),
+              detail: t('notice.deleteOne.detail', { size: fmtSize(freedOf(r.okIds)) }),
               at: at(),
             })
           } else {
-            setNotice({ kind: 'err', title: '删除失败', detail: r.message, at: at() })
+            setNotice({ kind: 'err', title: t('notice.deleteFailed'), detail: r.message, at: at() })
           }
           removeDeletedLocally(r.okIds)
         } finally {
@@ -457,19 +775,19 @@ window.__ModuleLoader__.load({
           if (r.failed === 0) {
             setNotice({
               kind: 'ok',
-              title: `已删除 ${r.ok} 个会话 · 释放 ${fmtSize(freedOf(r.okIds))}`,
-              detail: '已移入回收站 · 侧栏已隐藏 · 可在「回收站」页签还原',
+              title: t('notice.deleteBatch.title', { count: r.ok, size: fmtSize(freedOf(r.okIds)) }),
+              detail: t('notice.deleteBatch.detail'),
               at: at(),
             })
           } else if (r.ok > 0) {
             setNotice({
               kind: 'warn',
-              title: `已删除 ${r.ok} 个 · ${r.failed} 个失败`,
-              detail: `成功部分已入回收站；首条失败：${r.message}`,
+              title: t('notice.deletePartial.title', { ok: r.ok, failed: r.failed }),
+              detail: t('notice.deletePartial.detail', { message: r.message }),
               at: at(),
             })
           } else {
-            setNotice({ kind: 'err', title: `全部删除失败（${r.failed} 个）`, detail: r.message, at: at() })
+            setNotice({ kind: 'err', title: t('notice.deleteAllFailed', { count: r.failed }), detail: r.message, at: at() })
           }
           removeDeletedLocally(r.okIds)
         } finally {
@@ -486,15 +804,15 @@ window.__ModuleLoader__.load({
           markUnarchivedLocally([id])
           setNotice({
             kind: 'ok',
-            title: `已还原「${title || shortId(id)}」`,
-            detail: '已解除归档 · 侧栏原分组立即可见',
+            title: t('notice.restoreOne.title', { name: title || shortId(id) }),
+            detail: t('notice.restoreOk.detail'),
             at: at(),
           })
         } catch (e) {
           const code = e?.data?.error?.code
           setNotice({
             kind: code === 'UNSUPPORTED' ? 'warn' : 'err',
-            title: '还原失败',
+            title: t('notice.restoreFailed'),
             detail: String(e?.message ?? e),
             at: at(),
           })
@@ -504,7 +822,7 @@ window.__ModuleLoader__.load({
       }
       async function fireBatchUnarchive(ids) {
         setBusy(true)
-        setProgress({ done: 0, total: ids.length, label: '还原中' })
+        setProgress({ done: 0, total: ids.length, label: t('footer.progressRestore') })
         let ok = 0
         let failed = 0
         let message = null
@@ -520,15 +838,15 @@ window.__ModuleLoader__.load({
               failed += 1
               if (message === null) message = `${shortId(id)}：${e?.message ?? e}`
             }
-            setProgress({ done: i + 1, total: ids.length, label: '还原中' })
+            setProgress({ done: i + 1, total: ids.length, label: t('footer.progressRestore') })
           }
           markUnarchivedLocally(okIds)
           if (failed === 0) {
-            setNotice({ kind: 'ok', title: `已还原 ${ok} 个会话`, detail: '已解除归档 · 侧栏原分组立即可见', at: at() })
+            setNotice({ kind: 'ok', title: t('notice.restoreBatch.title', { count: ok }), detail: t('notice.restoreOk.detail'), at: at() })
           } else if (ok > 0) {
-            setNotice({ kind: 'warn', title: `已还原 ${ok} 个 · ${failed} 个失败`, detail: `首条失败：${message}`, at: at() })
+            setNotice({ kind: 'warn', title: t('notice.restoreAndUnarchiveBatch.title', { ok, failed }), detail: t('notice.firstFailure', { message }), at: at() })
           } else {
-            setNotice({ kind: 'err', title: `全部还原失败（${failed} 个）`, detail: message, at: at() })
+            setNotice({ kind: 'err', title: t('notice.restoreBatchAllFailed', { count: failed }), detail: message, at: at() })
           }
         } finally {
           setBusy(false)
@@ -544,15 +862,15 @@ window.__ModuleLoader__.load({
           if (r.stillArchived) {
             setNotice({
               kind: 'warn',
-              title: `文件已还原（${shortId(r.id ?? '')}）`,
-              detail: '当前 DSH 版本无法在线解除归档；彻底找回见 README 的 unhide 步骤',
+              title: t('notice.stillArchived.title', { id: shortId(r.id ?? '') }),
+              detail: t('notice.stillArchived.detail'),
               at: at(),
             })
           } else {
-            setNotice({ kind: 'ok', title: `已还原（${shortId(r.id ?? '')}）`, detail: '已解除归档 · 侧栏原分组立即可见', at: at() })
+            setNotice({ kind: 'ok', title: t('notice.restoreOk.title', { id: shortId(r.id ?? '') }), detail: t('notice.restoreOk.detail'), at: at() })
           }
         } catch (e) {
-          setNotice({ kind: 'err', title: '还原失败', detail: String(e?.message ?? e), at: at() })
+          setNotice({ kind: 'err', title: t('notice.restoreFailed'), detail: String(e?.message ?? e), at: at() })
         } finally {
           setBusy(false)
           await loadTrash()
@@ -565,9 +883,9 @@ window.__ModuleLoader__.load({
         setBusy(true)
         try {
           await post(`${PREFIX}/purge`, { entry })
-          setNotice({ kind: 'ok', title: '已彻底删除 1 项', detail: '回收站中已不可恢复', at: at() })
+          setNotice({ kind: 'ok', title: t('notice.purgeOne.title'), detail: t('notice.purgeOne.detail'), at: at() })
         } catch (e) {
-          setNotice({ kind: 'err', title: '彻底删除失败', detail: String(e?.message ?? e), at: at() })
+          setNotice({ kind: 'err', title: t('notice.purgeFailed'), detail: String(e?.message ?? e), at: at() })
         } finally {
           setBusy(false)
           await loadTrash()
@@ -578,9 +896,9 @@ window.__ModuleLoader__.load({
         setBusy(true)
         try {
           const r = await post(`${PREFIX}/purge`, { all: true })
-          setNotice({ kind: 'ok', title: `已清空回收站（${r.count ?? 0} 项）`, detail: null, at: at() })
+          setNotice({ kind: 'ok', title: t('notice.purgeAll.title', { count: r.count ?? 0 }), detail: null, at: at() })
         } catch (e) {
-          setNotice({ kind: 'err', title: '清空失败', detail: String(e?.message ?? e), at: at() })
+          setNotice({ kind: 'err', title: t('notice.purgeAllFailed'), detail: String(e?.message ?? e), at: at() })
         } finally {
           setBusy(false)
           await loadTrash()
@@ -590,7 +908,7 @@ window.__ModuleLoader__.load({
       async function fireBatchRestore(entries) {
         setArm(null)
         setBusy(true)
-        setProgress({ done: 0, total: entries.length, label: '还原中' })
+        setProgress({ done: 0, total: entries.length, label: t('footer.progressRestore') })
         let ok = 0
         let failed = 0
         let message = null
@@ -603,19 +921,19 @@ window.__ModuleLoader__.load({
               failed += 1
               if (message === null) message = String(e?.message ?? e)
             }
-            setProgress({ done: i + 1, total: entries.length, label: '还原中' })
+            setProgress({ done: i + 1, total: entries.length, label: t('footer.progressRestore') })
           }
           if (failed === 0) {
             setNotice({
               kind: 'ok',
-              title: `已还原 ${ok} 项`,
-              detail: unarchiveSupported ? '已解除归档 · 侧栏原分组立即可见' : '文件已归位；解除归档见「归档会话」页签',
+              title: t('notice.restoreBatchItems.title', { count: ok }),
+              detail: unarchiveSupported ? t('notice.restoreOk.detail') : t('notice.stillArchived.altDetail'),
               at: at(),
             })
           } else if (ok > 0) {
-            setNotice({ kind: 'warn', title: `已还原 ${ok} 项 · ${failed} 项失败`, detail: `首条失败：${message}`, at: at() })
+            setNotice({ kind: 'warn', title: t('notice.restoreBatchPartial.title', { ok, failed }), detail: t('notice.firstFailure', { message }), at: at() })
           } else {
-            setNotice({ kind: 'err', title: `全部还原失败（${failed} 项）`, detail: message, at: at() })
+            setNotice({ kind: 'err', title: t('notice.restoreBatchAllFailed', { count: failed }), detail: message, at: at() })
           }
         } finally {
           setBusy(false)
@@ -631,7 +949,7 @@ window.__ModuleLoader__.load({
         const entries = [...selected]
         setArm(null)
         setBusy(true)
-        setProgress({ done: 0, total: entries.length, label: '彻底删除中' })
+        setProgress({ done: 0, total: entries.length, label: t('footer.progressPurge') })
         let ok = 0
         let failed = 0
         let message = null
@@ -644,14 +962,14 @@ window.__ModuleLoader__.load({
               failed += 1
               if (message === null) message = String(e?.message ?? e)
             }
-            setProgress({ done: i + 1, total: entries.length, label: '彻底删除中' })
+            setProgress({ done: i + 1, total: entries.length, label: t('footer.progressPurge') })
           }
           if (failed === 0) {
-            setNotice({ kind: 'ok', title: `已彻底删除 ${ok} 项`, detail: '回收站中已不可恢复', at: at() })
+            setNotice({ kind: 'ok', title: t('notice.purgeBatch.title', { count: ok }), detail: t('notice.purgeOne.detail'), at: at() })
           } else if (ok > 0) {
-            setNotice({ kind: 'warn', title: `已彻底删除 ${ok} 项 · ${failed} 项失败`, detail: `首条失败：${message}`, at: at() })
+            setNotice({ kind: 'warn', title: t('notice.purgeBatchPartial.title', { ok, failed }), detail: t('notice.firstFailure', { message }), at: at() })
           } else {
-            setNotice({ kind: 'err', title: `全部彻底删除失败（${failed} 项）`, detail: message, at: at() })
+            setNotice({ kind: 'err', title: t('notice.purgeBatchAllFailed', { count: failed }), detail: message, at: at() })
           }
         } finally {
           setBusy(false)
@@ -699,13 +1017,13 @@ window.__ModuleLoader__.load({
 
       const groups = new Map()
       for (const s of filteredAll) {
-        const key = s.cwd ?? '(无目录)'
+        const key = s.cwd ?? t('common.noWorkspace')
         if (!groups.has(key)) groups.set(key, [])
         groups.get(key).push(s)
       }
       const groupMeta = (key) => {
         const ws = workspaces.find((w) => w.path === key)
-        const name = ws?.title || (key === '(无目录)' ? key : key.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || key)
+        const name = ws?.title || (key === t('common.noWorkspace') ? key : key.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || key)
         return { name, path: key }
       }
 
@@ -775,12 +1093,12 @@ window.__ModuleLoader__.load({
             }),
             h(
               'span',
-              { key: 't', style: { fontSize: 13, color: T.label, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }, title: `${s.title ?? '未命名'}\n${s.id}\n${s.cwd ?? ''}` },
-              s.title || `未命名 · ${shortId(s.id)}`,
+              { key: 't', style: { fontSize: 13, color: T.label, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }, title: `${s.title ?? t('common.untitled')}\n${s.id}\n${s.cwd ?? ''}` },
+              s.title || `${t('common.untitled')} · ${shortId(s.id)}`,
             ),
-            s.running ? h('span', { key: 'r', style: tagStyle(T.err) }, '运行中') : null,
-            s.live && !s.running ? h('span', { key: 'lv', style: tagStyle(T.brand) }, '打开中') : null,
-            s.origin === 'subagent' ? h('span', { key: 'sa', style: tagStyle(T.warn) }, '子代理') : null,
+            s.running ? h('span', { key: 'r', style: tagStyle(T.err) }, t('tag.running')) : null,
+            s.live && !s.running ? h('span', { key: 'lv', style: tagStyle(T.brand) }, t('tag.open')) : null,
+            s.origin === 'subagent' ? h('span', { key: 'sa', style: tagStyle(T.warn) }, t('tag.subagent')) : null,
             h('span', { key: 'm', title: fmtDate(s.mtimeMs), style: { fontSize: 11, color: T.secondary, flexShrink: 0, width: 64, textAlign: 'right' } }, fmtAgo(s.mtimeMs)),
             h('span', { key: 's', style: { fontSize: 11, color: T.secondary, flexShrink: 0, width: 64, textAlign: 'right', fontVariantNumeric: 'tabular-nums' } }, fmtSize(s.sizeBytes)),
             opts?.restore
@@ -791,9 +1109,9 @@ window.__ModuleLoader__.load({
                     className: 'sd-btn',
                     style: { ...smallBtn, borderColor: `color-mix(in srgb, ${T.brand} 45%, ${T.border})`, color: T.brand },
                     disabled: busy,
-                    title: '解除归档：会话立即回到侧栏原分组',
+                    title: t('restore.rowHint'),
                     onClick: () => fireSingleUnarchive(s.id),
-                  }, '还原'),
+                  }, t('restore.label')),
                 )
               : null,
             opts?.singleDelete
@@ -805,7 +1123,9 @@ window.__ModuleLoader__.load({
                     onArm: () => setArm(s.id),
                     onFire: () => fireSingleDelete(s.id),
                     busy,
-                    hint: '删除后移入回收站并保持侧栏隐藏，可在「回收站」页签还原',
+                    label: t('delete.label'),
+                    armedLabel: t('delete.confirm'),
+                    hint: t('delete.hint'),
                   }),
                 )
               : null,
@@ -845,7 +1165,7 @@ window.__ModuleLoader__.load({
             h(
               'span',
               { key: 'rw', onClick: (e) => e.stopPropagation(), style: { display: 'inline-flex', flexShrink: 0 } },
-              h('button', { className: 'sd-btn', style: { ...smallBtn, borderColor: `color-mix(in srgb, ${T.brand} 45%, ${T.border})`, color: T.brand }, disabled: busy, onClick: () => fireRestore(it.entry) }, '还原'),
+              h('button', { className: 'sd-btn', style: { ...smallBtn, borderColor: `color-mix(in srgb, ${T.brand} 45%, ${T.border})`, color: T.brand }, disabled: busy, onClick: () => fireRestore(it.entry) }, t('restore.label')),
             ),
             h(
               'span',
@@ -855,7 +1175,8 @@ window.__ModuleLoader__.load({
                 onArm: () => setArm(`t:${it.entry}`),
                 onFire: () => firePurge(it.entry),
                 busy,
-                label: '彻底删除',
+                label: t('purge.label'),
+                armedLabel: t('purge.confirm'),
               }),
             ),
           ],
@@ -864,24 +1185,24 @@ window.__ModuleLoader__.load({
 
       // ---------- 页签内容（仅滚动列表区） ----------
       function ArchivedTab() {
-        if (listLoading && list === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '加载中…')
+        if (listLoading && list === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('common.loading'))
         if (archivedSessions.length === 0) {
           return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0', lineHeight: '20px' } }, [
-            h('div', { key: 'a' }, '没有已归档的会话。'),
-            h('div', { key: 'b', style: { marginTop: 4 } }, '在侧栏会话上右键「归档会话」后，可在此处真正删除其磁盘记录。'),
+            h('div', { key: 'a' }, t('empty.archived')),
+            h('div', { key: 'b', style: { marginTop: 4 } }, t('empty.archivedHint')),
           ])
         }
         return h('div', null, archivedSessions.map((s) => sessionRow(s, { singleDelete: true, restore: unarchiveSupported })))
       }
 
       function AllTab() {
-        if (listLoading && list === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '加载中…')
-        if (sessions.length === 0) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '没有可列出的会话')
+        if (listLoading && list === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('common.loading'))
+        if (sessions.length === 0) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('empty.list'))
         return h(
           'div',
           null,
           groups.size === 0
-            ? h('div', { key: 'e', style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '当前过滤条件下没有会话')
+            ? h('div', { key: 'e', style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('empty.filtered'))
             : [...groups].map(([key, groupSessions]) => {
                 const meta = groupMeta(key)
                 return h(
@@ -903,7 +1224,7 @@ window.__ModuleLoader__.load({
                         style: { accentColor: T.brand, cursor: 'pointer' },
                       }),
                       h('span', { key: 'n', style: { fontSize: 12, fontWeight: 600, color: T.secondary, letterSpacing: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, title: meta.path }, meta.name),
-                      h('span', { key: 'i', style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))', flexShrink: 0 } }, `${groupSessions.length} 会话 · ${fmtSize(groupSessions.reduce((a, s) => a + (s.sizeBytes ?? 0), 0))}`),
+                      h('span', { key: 'i', style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))', flexShrink: 0 } }, t('group.countSize', { count: groupSessions.length, size: fmtSize(groupSessions.reduce((a, s) => a + (s.sizeBytes ?? 0), 0)) })),
                     ]),
                     ...groupSessions.map((s) => sessionRow(s, { indent: true, singleDelete: true, restore: s.archived && unarchiveSupported })),
                   ],
@@ -913,13 +1234,13 @@ window.__ModuleLoader__.load({
       }
 
       function TrashTab() {
-        if (trashLoading && trash === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '加载中…')
+        if (trashLoading && trash === null) return h('div', { style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('common.loading'))
         const items = trash ?? []
         return h(
           'div',
           null,
           items.length === 0
-            ? h('div', { key: 'e', style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, '回收站为空')
+            ? h('div', { key: 'e', style: { fontSize: 13, color: T.secondary, padding: '8px 0' } }, t('empty.trash'))
             : items.map((it) => trashRow(it)),
         )
       }
@@ -940,18 +1261,18 @@ window.__ModuleLoader__.load({
                 'span',
                 { key: 'n', style: { fontSize: 12, color: T.secondary } },
                 busy
-                  ? `${progress?.label ?? '处理中'} ${progress?.done ?? 0}/${progress?.total ?? 0}`
+                  ? `${progress?.label ?? t('footer.progress')} ${progress?.done ?? 0}/${progress?.total ?? 0}`
                   : selected.size > 0
-                    ? `已选 ${selected.size} 项 · ${fmtSize(selItems.reduce((a, i) => a + (i.sizeBytes ?? 0), 0))}`
-                    : `${items.length} 项 · ${fmtSize(items.reduce((a, i) => a + (i.sizeBytes ?? 0), 0))}`,
+                    ? t('footer.selectedCount', { count: selected.size, size: fmtSize(selItems.reduce((a, i) => a + (i.sizeBytes ?? 0), 0)) })
+                    : t('footer.countSize', { count: items.length, size: fmtSize(items.reduce((a, i) => a + (i.sizeBytes ?? 0), 0)) }),
               ),
               h(
                 'button',
                 { key: 'all', className: 'sd-btn', style: smallBtn, disabled: busy || trashLoading, onClick: () => setSelected(allSelected ? new Set() : new Set(items.map((i) => i.entry))) },
-                allSelected ? '取消全选' : `全选 (${items.length})`,
+                allSelected ? t('footer.deselectAll') : t('footer.selectAll', { count: items.length }),
               ),
               selected.size > 0
-                ? h('button', { key: 'c', className: 'sd-btn', style: smallBtn, disabled: busy, onClick: () => setSelected(new Set()) }, '清除')
+                ? h('button', { key: 'c', className: 'sd-btn', style: smallBtn, disabled: busy, onClick: () => setSelected(new Set()) }, t('footer.clear'))
                 : null,
               h(
                 'button',
@@ -960,10 +1281,10 @@ window.__ModuleLoader__.load({
                   className: 'sd-btn',
                   style: { ...smallBtn, borderColor: `color-mix(in srgb, ${T.brand} 45%, ${T.border})`, color: T.brand, fontWeight: 600 },
                   disabled: busy || selected.size === 0,
-                  title: '还原所选：文件归位并解除归档',
+                  title: t('restore.selectedHint'),
                   onClick: () => fireBatchRestore([...selected]),
                 },
-                `还原所选 (${selected.size})`,
+                t('restore.selected', { count: selected.size }),
               ),
               h(
                 'button',
@@ -974,7 +1295,7 @@ window.__ModuleLoader__.load({
                   disabled: busy || selected.size === 0,
                   onClick: () => (purgeSelArmed ? fireBatchPurgeSelected() : setArm('trash-sel')),
                 },
-                purgeSelArmed ? `确认彻底删除 (${selected.size})` : `彻底删除所选 (${selected.size})`,
+                purgeSelArmed ? t('purge.confirmSelected', { count: selected.size }) : t('purge.selected', { count: selected.size }),
               ),
               h(
                 'button',
@@ -985,7 +1306,7 @@ window.__ModuleLoader__.load({
                   disabled: busy,
                   onClick: () => (purgeAllArmed ? firePurgeAll() : setPurgeAllArmed(true)),
                 },
-                purgeAllArmed ? '确认清空（不可恢复）' : '清空回收站',
+                purgeAllArmed ? t('purge.confirmEmpty') : t('purge.empty'),
               ),
             ]),
           )
@@ -1001,14 +1322,14 @@ window.__ModuleLoader__.load({
         const batchDelArmed = arm === 'sel:del'
         return h('div', { style: { borderTop: `1px solid ${T.border}`, paddingTop: 8, marginTop: 8, flex: 'none' } }, [
           h('div', { key: 'b', style: { display: 'flex', alignItems: 'center', gap: 8 } }, [
-            h('span', { key: 'n', style: { fontSize: 12, color: T.secondary } }, busy ? `${progress?.label ?? '删除中'} ${progress?.done ?? 0}/${progress?.total ?? 0}` : `已选 ${selected.size} 项 · ${fmtSize(selectedBytes(rows))}`),
+            h('span', { key: 'n', style: { fontSize: 12, color: T.secondary } }, busy ? `${progress?.label ?? t('footer.progressDelete')} ${progress?.done ?? 0}/${progress?.total ?? 0}` : t('footer.selectedCount', { count: selected.size, size: fmtSize(selectedBytes(rows)) })),
             h(
               'button',
-              { key: 'all', className: 'sd-btn', style: smallBtn, disabled: busy || listLoading, onClick: toggleSelectAll, title: allSelected ? '取消选择当前列表的全部会话' : '选中当前列表的全部会话（跟随过滤与搜索）' },
-              allSelected ? '取消全选' : `全选 (${rows.length})`,
+              { key: 'all', className: 'sd-btn', style: smallBtn, disabled: busy || listLoading, onClick: toggleSelectAll, title: allSelected ? t('footer.selectAllHintOff') : t('footer.selectAllHint') },
+              allSelected ? t('footer.deselectAll') : t('footer.selectAll', { count: rows.length }),
             ),
             selected.size > 0
-              ? h('button', { key: 'c', className: 'sd-btn', style: smallBtn, disabled: busy, onClick: () => setSelected(new Set()) }, '清除')
+              ? h('button', { key: 'c', className: 'sd-btn', style: smallBtn, disabled: busy, onClick: () => setSelected(new Set()) }, t('footer.clear'))
               : null,
             showRestore
               ? h(
@@ -1018,10 +1339,10 @@ window.__ModuleLoader__.load({
                     className: 'sd-btn',
                     style: { ...smallBtn, marginLeft: 'auto', borderColor: `color-mix(in srgb, ${T.brand} 45%, ${T.border})`, color: T.brand, fontWeight: 600 },
                     disabled: busy || selected.size === 0,
-                    title: '解除所选会话的归档：侧栏原分组立即可见',
+                    title: t('restore.selectedUnarchHint'),
                     onClick: () => fireBatchUnarchive([...selected]),
                   },
-                  `还原所选 (${selected.size})`,
+                  t('restore.selected', { count: selected.size }),
                 )
               : null,
             h(
@@ -1031,11 +1352,11 @@ window.__ModuleLoader__.load({
                 className: 'sd-btn',
                 style: { ...smallBtn, marginLeft: showRestore ? 0 : 'auto', background: selected.size > 0 ? T.err : 'transparent', borderColor: selected.size > 0 ? T.err : T.border, color: selected.size > 0 ? '#fff' : T.label, fontWeight: 600 },
                 disabled: busy || selected.size === 0,
-                title: '删除后移入回收站，可在「回收站」页签还原',
+                title: t('delete.selectedHint'),
                 onClick: () => (batchDelArmed ? fireBatchDelete([...selected]) : setArm('sel:del')),
               },
               busy ? h('span', { className: 'sd-spin' }, '↻') : null,
-              batchDelArmed ? `确认删除 (${selected.size})` : `删除所选 (${selected.size})`,
+              batchDelArmed ? t('delete.confirmSelected', { count: selected.size }) : t('delete.selected', { count: selected.size }),
             ),
           ]),
         ])
@@ -1054,12 +1375,12 @@ window.__ModuleLoader__.load({
             'div',
             { key: 'tb-all', style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', margin: '10px 0 0', flex: 'none' } },
             [
-              h('input', { key: 'q', style: { ...inputStyle, width: 160 }, placeholder: '搜索标题 / id', value: query, onChange: (e) => setQuery(e.target.value) }),
-              filterBtn('active', '未归档'),
-              filterBtn('stale30', '30 天未动'),
-              filterBtn('archived', '已归档'),
-              filterBtn('all', '全部'),
-              h('span', { key: 'n', style: { fontSize: 12, color: T.secondary, marginLeft: 'auto' } }, `${filteredAll.length} / ${sessions.length}`),
+              h('input', { key: 'q', style: { ...inputStyle, width: 160 }, placeholder: t('toolbar.searchPlaceholder'), value: query, onChange: (e) => setQuery(e.target.value) }),
+              filterBtn('active', t('filter.active')),
+              filterBtn('stale30', t('filter.stale30')),
+              filterBtn('archived', t('filter.archived')),
+              filterBtn('all', t('filter.all')),
+              h('span', { key: 'n', style: { fontSize: 12, color: T.secondary, marginLeft: 'auto' } }, t('filter.matchCount', { shown: filteredAll.length, total: sessions.length })),
             ],
           )
         }
@@ -1069,13 +1390,14 @@ window.__ModuleLoader__.load({
             { key: 'tb-arch', style: { margin: '10px 0 0', flex: 'none' } },
             [
               h('div', { key: 'a', style: { fontSize: 12, color: T.secondary, lineHeight: '18px' } },
-                `${archivedSessions.length} 个已归档会话 · 共 ${fmtSize(archivedSessions.reduce((a, s) => a + (s.sizeBytes ?? 0), 0))}；删除后进入回收站，可还原或彻底删除。`),
+                t('toolbar.archivedSummary', {
+                  count: archivedSessions.length,
+                  size: fmtSize(archivedSessions.reduce((a, s) => a + (s.sizeBytes ?? 0), 0)),
+                })),
               h('div', { key: 'b', style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))', lineHeight: '17px', marginTop: 2 } },
-                unarchiveSupported
-                  ? '点击行内「还原」或勾选后批量还原：会话立即回到侧栏原分组，无需重启。'
-                  : '当前 DSH 版本不支持在线解除归档；如需找回，见 README 的 unhide 步骤。'),
+                unarchiveSupported ? t('toolbar.unarchHint') : t('toolbar.unarchUnavailable')),
               h('div', { key: 'c', style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary))', lineHeight: '17px', marginTop: 2 } },
-                '删除后会话保持归档隐藏，不会回到侧栏；归档标记在下次重启 DSH 时彻底清理，回收站还原则立即恢复显示。'),
+                t('toolbar.keepHidden')),
             ],
           )
         }
@@ -1092,14 +1414,14 @@ window.__ModuleLoader__.load({
               'div',
               { key: 'tabs', style: { display: 'inline-flex', gap: 2, padding: 2, background: T.layer1, border: `1px solid ${T.border}`, borderRadius: 8 } },
               [
-                tabBtn('archived', '归档会话', list ? archivedSessions.length : undefined),
-                tabBtn('all', '全部会话', list ? sessions.length : undefined),
-                tabBtn('trash', '回收站', trash ? trash.length : undefined),
+                tabBtn('archived', t('tab.archived'), list ? archivedSessions.length : undefined),
+                tabBtn('all', t('tab.all'), list ? sessions.length : undefined),
+                tabBtn('trash', t('tab.trash'), trash ? trash.length : undefined),
               ],
             ),
             h(
               'button',
-              { key: 'r', className: 'sd-btn', style: { ...smallBtn, marginLeft: 'auto' }, disabled: busy || (tab === 'trash' ? trashLoading : listLoading), title: '重新加载', onClick: () => (tab === 'trash' ? loadTrash() : loadList()) },
+              { key: 'r', className: 'sd-btn', style: { ...smallBtn, marginLeft: 'auto' }, disabled: busy || (tab === 'trash' ? trashLoading : listLoading), title: t('common.reload'), onClick: () => (tab === 'trash' ? loadTrash() : loadList()) },
               h('span', { className: (tab === 'trash' ? trashLoading : listLoading) || busy ? 'sd-spin' : undefined }, '↻'),
             ),
           ]),
@@ -1120,26 +1442,27 @@ window.__ModuleLoader__.load({
     // 注册壳：恒定 hooks + 自有错误边界 + nav 图标 retag
     // =========================================================================
 
-    /** 设置面板 nav 行的显示文本（与注册 label 一致）。 */
-    const NAV_LABEL = '归档会话'
+    /** 设置面板 nav 行的显示文本（与注册 label 一致；随生效语言变化）。 */
+    const NAV_LABEL = () => t('nav.archived')
 
     /**
      * 给设置面板 nav 行打 data-sd-nav 标记（幂等）。
      * 官方面板按 section id 硬编码 nav 图标（models/agent-presets/plugins），
      * 其余 id 一律回退为与设置入口相同的齿轮；注册协议没有 icon 字段。
-     * 判定条件：按钮的直接子 span 文本 === NAV_LABEL 且按钮有 svg 直接子节点
+     * 判定条件：按钮的直接子 span 文本 === 当前 nav 标签且按钮有 svg 直接子节点
      * （nav 行图标是 svg；本插件页签里的同名文本按钮没有 svg，不会误伤）。
      * 标记后由 CSS 隐藏齿轮、以 currentColor mask 画 16px 线性垃圾桶。
      */
     function tagNavButtons(root) {
       if (typeof document === 'undefined') return
       try {
+        const currentNavLabel = t('nav.archived')
         const scope = root ?? document
         const buttons = scope.querySelectorAll ? scope.querySelectorAll('button') : []
         for (const btn of buttons) {
           if (btn.hasAttribute('data-sd-nav')) continue
           const span = btn.querySelector(':scope > span')
-          if (span && span.textContent === NAV_LABEL && btn.querySelector(':scope > svg')) {
+          if (span && span.textContent === currentNavLabel && btn.querySelector(':scope > svg')) {
             btn.setAttribute('data-sd-nav', '1')
           }
         }
@@ -1166,7 +1489,7 @@ window.__ModuleLoader__.load({
             'div',
             { style: { fontSize: 13, color: T.err, lineHeight: '20px', padding: '12px 0' } },
             [
-              h('div', { key: 't', style: { fontWeight: 600 } }, '「归档会话」页渲染失败'),
+              h('div', { key: 't', style: { fontWeight: 600 } }, t('error.title')),
               h('div', { key: 'm', style: { color: T.secondary } }, String(this.state.error?.message ?? this.state.error)),
               h(
                 'button',
@@ -1176,7 +1499,7 @@ window.__ModuleLoader__.load({
                   style: { ...btnBase, marginTop: 8 },
                   onClick: () => this.setState({ error: null }),
                 },
-                '重试',
+                t('common.retry'),
               ),
             ],
           )
@@ -1196,10 +1519,278 @@ window.__ModuleLoader__.load({
       return h(SectionErrorBoundary, null, h(SettingsPage, { close: props?.close, currentId }))
     }
 
-    // ---------- 注册 ----------
+    // =========================================================================
+    // 插件配置（宿主 settings 命名空间 session-delete 的卡片）
+    // =========================================================================
+
+    /**
+     * Plugins 设置区的本插件配置卡：
+     * - locale：下拉（中文 / English / 跟随应用），生效语言即时切换本插件全部文案；
+     * - sidebarButton：开关（默认关；开启后在侧栏底部注册删除入口）。
+     * 写路径与官方插件卡一致：ctx.settingsScope.bind({ namespace }) + scope.set 字段写入。
+     * 卡片文案用本插件自家 t()（不依赖 slot 系统的 t 注入）。
+     */
+    function SessionDeleteConfigCard(props) {
+      useLocaleTick()
+      const state = props?.useSessionDeleteCard ? props.useSessionDeleteCard((s) => s) : configStore.getSnapshot()
+      if (state == null) return null
+      const writable = state.writable !== false
+      const localeValue = state.draftLocale ?? state.locale ?? 'en'
+      const sidebarChecked = (state.draftSidebar ?? state.sidebarButton) === true
+      const dirty = state.draftLocale != null || state.draftSidebar != null
+      const saving = state.saving === true
+      const failed = state.saveFailed === true
+
+      function edit(field, value) {
+        const s = { ...configStore.getSnapshot() }
+        if (field === 'locale') s.draftLocale = value
+        else if (field === 'sidebarButton') s.draftSidebar = value
+        configStore.set(s)
+      }
+      function discard() {
+        configStore.set({ ...configStore.getSnapshot(), draftLocale: null, draftSidebar: null, saveFailed: false })
+      }
+      async function save() {
+        const s = { ...configStore.getSnapshot() }
+        const changes = []
+        if (s.draftLocale != null) changes.push(['locale', s.draftLocale])
+        if (s.draftSidebar != null) changes.push(['sidebarButton', s.draftSidebar])
+        if (changes.length === 0) return
+        configStore.set({ ...s, saving: true, saveFailed: false })
+        try {
+          if (configScope) {
+            for (const [field, value] of changes) await configScope.set(field, value)
+          } else {
+            configStore.set({
+              ...configStore.getSnapshot(),
+              locale: changes.some(([f]) => f === 'locale') ? s.draftLocale : configStore.getSnapshot().locale,
+              sidebarButton: changes.some(([f]) => f === 'sidebarButton') ? s.draftSidebar === true : configStore.getSnapshot().sidebarButton,
+              draftLocale: null,
+              draftSidebar: null,
+              saving: false,
+              saveFailed: false,
+            })
+          }
+        } catch {
+          configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: true })
+          return
+        }
+        configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: false })
+      }
+
+      return h(
+        'div',
+        { style: { fontSize: 13, color: T.secondary, width: '100%' } },
+        [
+          !writable ? h('p', { key: 'ro', role: 'status', style: { margin: '0 0 4px' } }, t('card.readOnly')) : null,
+          h('div', { key: 'row1', style: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0', flexWrap: 'wrap' } }, [
+            h('label', { key: 'l', htmlFor: 'sd-cfg-locale', style: { color: T.label, flex: 'none' } }, t('card.locale.label')),
+            h('select', {
+              key: 's',
+              id: 'sd-cfg-locale',
+              style: { ...inputStyle, flex: 'none' },
+              disabled: !writable || saving,
+              value: localeValue,
+              onChange: (e) => (props.edit ? props.edit('locale', e.target.value) : edit('locale', e.target.value)),
+            }, [
+              h('option', { key: 'zh', value: 'zh' }, t('card.locale.zh')),
+              h('option', { key: 'en', value: 'en' }, t('card.locale.en')),
+              h('option', { key: 'auto', value: 'auto' }, t('card.locale.auto')),
+            ]),
+            state.draftLocale != null ? h('span', { key: 'u', style: { fontSize: 12, color: T.warn } }, t('card.unsaved')) : null,
+          ]),
+          h('div', { key: 'row2', style: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' } }, [
+            h('input', {
+              key: 'c',
+              id: 'sd-cfg-sidebar',
+              type: 'checkbox',
+              style: { accentColor: T.brand, cursor: 'pointer' },
+              checked: sidebarChecked,
+              disabled: !writable || saving,
+              onChange: (e) => (props.edit ? props.edit('sidebarButton', e.target.checked) : edit('sidebarButton', e.target.checked)),
+            }),
+            h('label', { key: 'l', htmlFor: 'sd-cfg-sidebar', style: { color: T.label, cursor: writable && !saving ? 'pointer' : 'default' } }, t('card.sidebarButton.label')),
+            state.draftSidebar != null ? h('span', { key: 'u', style: { fontSize: 12, color: T.warn } }, t('card.unsaved')) : null,
+          ]),
+          h('p', { key: 'h1', style: { margin: '4px 0 0', lineHeight: '18px' } }, t('card.locale.hint')),
+          h('p', { key: 'h2', style: { margin: '2px 0 0', lineHeight: '18px' } }, t('card.sidebarButton.hint')),
+          (dirty || saving || failed) && writable
+            ? h('div', { key: 'act', style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } }, [
+                failed ? h('span', { key: 'f', role: 'status', style: { color: T.err } }, t('card.saveFailed')) : null,
+                h('button', {
+                  key: 'd',
+                  className: 'sd-btn',
+                  style: smallBtn,
+                  disabled: !dirty || saving,
+                  onClick: () => (props.discard ? props.discard() : discard()),
+                }, t('card.discard')),
+                h('button', {
+                  key: 's',
+                  className: 'sd-btn',
+                  style: { ...smallBtn, borderColor: T.brand, color: T.brand, fontWeight: 600 },
+                  disabled: !dirty || saving,
+                  onClick: () => (props.save ? props.save() : save()),
+                }, saving ? t('card.saving') : t('card.save')),
+              ])
+            : null,
+        ],
+      )
+    }
+
+    // =========================================================================
+    // 侧栏底部删除按钮（sidebar.footer.action；仅 config.sidebarButton=true 注册）
+    // =========================================================================
+
+    /** 16px 垃圾桶（与 nav 图标同一 path，currentColor）。 */
+    function TrashIcon() {
+      return h('svg', {
+        width: 16,
+        height: 16,
+        viewBox: '0 0 16 16',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 1.3,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        'aria-hidden': true,
+      }, h('path', { d: 'M2.5 4.2h11M6.3 2.2h3.4M3.8 4.2l.55 8.5a1 1 0 0 0 1 .93h5.3a1 1 0 0 0 1-.93l.55-8.5M6.5 7v4.3M9.5 7v4.3' }))
+    }
+
+    /**
+     * 侧栏底部的删除当前会话入口。
+     *
+     * 与设置页完全同一条删除路径：同一个 ArmDeleteButton 两步确认（第一次点击
+     * 武装，4 秒内再点执行）、同一个 /delete 只读恢复语义（移入回收站）、同一个
+     * 删除后本地清理（refresh + 必要时 startSession 切走）。没有彻底删除入口——
+     * 侧栏按钮永远默认更安全的可恢复动作。
+     */
+    function SidebarTrashAction(props) {
+      const useSessionsHook = props?.useSessions ?? ((selector) => selector(undefined))
+      const currentId = useSessionsHook((s) => s?.current)
+      useLocaleTick()
+      const [armed, setArmed] = useState(false)
+      const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState(null)
+      const wide = props?.wide !== false
+      const [noticeOpen, setNoticeOpen] = useState(false)
+
+      useArmExpire(armed ? 'sidebar' : null, () => setArmed(false))
+      useEffect(() => {
+        if (!notice || notice.kind !== 'ok') return
+        const timer = setTimeout(() => setNotice(null), 6000)
+        return () => clearTimeout(timer)
+      }, [notice?.at])
+
+      async function fire() {
+        if (!currentId || busy) return
+        setArmed(false)
+        setBusy(true)
+        try {
+          const r = await deleteMany([currentId], currentId)
+          if (r.ok > 0) {
+            setNotice({
+              kind: 'ok',
+              title: t('notice.deleteOne.title', { name: currentId }),
+              detail: t('notice.deleteBatch.detail'),
+              at: Date.now(),
+            })
+          } else {
+            setNotice({ kind: 'err', title: t('notice.deleteFailed'), detail: r.message, at: Date.now() })
+          }
+          refreshClientSessionList()
+          setNoticeOpen(true)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' } },
+        [
+          h(
+            'button',
+            {
+              key: 'b',
+              className: 'sd-btn',
+              style: {
+                ...smallBtn,
+                width: '100%',
+                justifyContent: wide === true ? 'flex-start' : 'center',
+                padding: wide === true ? '5px 9px' : '5px 0',
+                border: 'none',
+                borderRadius: 6,
+                background: armed ? T.err : 'transparent',
+                borderColor: armed ? T.err : 'transparent',
+                color: armed ? '#fff' : T.secondary,
+                fontWeight: armed ? 600 : 400,
+                gap: 7,
+              },
+              disabled: busy,
+              title: armed ? t('sidebar.delete.confirmHint') : t('sidebar.delete.hint'),
+              'aria-label': armed ? t('sidebar.delete.confirm') : t('sidebar.delete.name'),
+              onClick: () => (armed ? fire() : setArmed(true)),
+            },
+            [
+              h(TrashIcon, { key: 'i' }),
+              wide === true ? h('span', { key: 'l' }, armed ? t('sidebar.delete.confirm') : t('sidebar.delete.name')) : null,
+            ].filter(Boolean),
+          ),
+          noticeOpen && notice ? h(NoticeBanner, { key: 'n', notice, onClose: () => setNoticeOpen(false) }) : null,
+        ],
+      )
+    }
+
+    // =========================================================================
+    // 注册
+    // =========================================================================
+
+    /** 把宿主 settingsScope 的解析值流进 configStore（卡片与侧栏共用同一存储）。 */
+    function syncConfigFromScope() {
+      try {
+        const s = configScope.getSnapshot()
+        const resolved = { ...(s.base ?? {}), ...(s.value ?? {}) }
+        configStore.set({
+          locale: resolved.locale ?? 'en',
+          sidebarButton: resolved.sidebarButton === true,
+          writable: s.writable !== false,
+          revision: (configStore.getSnapshot().revision ?? 0) + 1,
+        })
+      } catch {
+        /* scope 契约外：保持默认 auto/关闭 */
+      }
+    }
+
+    /** apply：client 半的注册入口。 */
     function apply(ctx) {
       workspacesService = ctx.workspaces
       clientCtx = ctx
+
+      // 宿主 locale 服务（可选注入）：登记双语文案 + auto 跟随 active locale
+      try { localeCtx = ctx.locale ?? null } catch {}
+      if (localeCtx && typeof localeCtx.register === 'function') {
+        ctx.effect(() => {
+          const d1 = localeCtx.register(LOCALE_NS, 'zh', LOCALES.zh)
+          const d2 = localeCtx.register(LOCALE_NS, 'en', LOCALES.en)
+          return () => { d1(); d2() }
+        })
+      }
+
+      // 宿主 settings 命名空间（可选注入）：config 流 + 卡片读写共用 configScope
+      try {
+        configScope = ctx.settingsScope?.bind?.({ namespace: 'session-delete' }) ?? null
+      } catch {
+        configScope = null
+      }
+      if (configScope) {
+        ctx.effect(() => {
+          syncConfigFromScope()
+          if (typeof configScope.subscribe !== 'function') return undefined
+          const off = configScope.subscribe(syncConfigFromScope)
+          return off
+        })
+      }
+
       ctx.effect(() => {
         const el = document.createElement('style')
         el.id = 'dsh-session-delete-styles'
@@ -1227,15 +1818,111 @@ window.__ModuleLoader__.load({
       })
       ctx.effect(() =>
         ctx.slots.inject('settings.section', () =>
-          ctx.slots.register({ name: 'settings.section', id: 'session-delete', order: 20, label: () => NAV_LABEL }, ArchiveSettingsSection),
+          ctx.slots.register({ name: 'settings.section', id: 'session-delete', order: 20, label: NAV_LABEL }, ArchiveSettingsSection),
         ),
       )
+
+      // Plugins 设置区：本插件配置卡（键 = settings 命名空间，官方按 ns 分发卡片）。
+      // 卡面通过 hooks 拿 configStore 快照、通过 actions 拿编辑/写路径（与官方卡同构）。
+      ctx.effect(() =>
+        ctx.slots.inject('settings.plugin.item', () =>
+          ctx.slots.register(
+            {
+              name: 'settings.plugin.item',
+              key: 'session-delete',
+              locale: LOCALE_NS,
+              inject: () => ({
+                hooks: { sessionDeleteCard: configStore },
+                edit: (field, value) => {
+                  const s = { ...configStore.getSnapshot() }
+                  if (field === 'locale') s.draftLocale = value
+                  if (field === 'sidebarButton') s.draftSidebar = value
+                  s.revision = (s.revision ?? 0) + 1
+                  configStore.set(s)
+                },
+                discard: () =>
+                  configStore.set({ ...configStore.getSnapshot(), draftLocale: null, draftSidebar: null, saveFailed: false, revision: (configStore.getSnapshot().revision ?? 0) + 1 }),
+                save: saveDraft,
+              }),
+            },
+            SessionDeleteConfigCard,
+          ),
+        ),
+      )
+
+      // 侧栏底部删除入口：仅在 sidebarButton=true 时真正注册 occupant；
+      // 关闭/离线（无 settingsScope）时不注册任何东西（连隐藏元素也没有）。
+      ctx.effect(() => {
+        let unreg = null
+        const regOrDrop = () => {
+          const want = configStore.getSnapshot().sidebarButton === true
+          if (want && unreg === null) {
+            unreg = ctx.slots.register(
+              { name: 'sidebar.footer.action', id: 'session-delete', order: 100, label: NAV_LABEL },
+              SidebarTrashAction,
+            )
+          } else if (!want && unreg !== null) {
+            unreg()
+            unreg = null
+          }
+        }
+        regOrDrop()
+        const off = configStore.subscribe(regOrDrop)
+        return () => {
+          off()
+          if (unreg) {
+            unreg()
+            unreg = null
+          }
+        }
+      })
+    }
+
+    /** 卡片「保存」：草稿字段逐个写入 settings scope；无 scope（离线）就地生效。 */
+    async function saveDraft() {
+      const s = { ...configStore.getSnapshot() }
+      const changes = []
+      if (s.draftLocale != null) changes.push(['locale', s.draftLocale])
+      if (s.draftSidebar != null) changes.push(['sidebarButton', s.draftSidebar])
+      if (changes.length === 0) return
+      configStore.set({ ...s, saving: true, saveFailed: false })
+      try {
+        if (configScope) {
+          for (const [field, value] of changes) await configScope.set(field, value)
+          // 写后立即从 scope 回读 resolved 值（scope subscribe 缺失/滞后的双腿保险）；
+          // 若回读结果仍是 undefined/类型不符，则以本次写入值为准就地生效——
+          // 卡片语言绝不能比配置滞后一步。
+          syncConfigFromScope()
+          const st = configStore.getSnapshot()
+          const next = { ...st, draftLocale: null, draftSidebar: null, saving: false }
+          for (const [field, value] of changes) if (typeof st[field] !== typeof value || st[field] === undefined) next[field] = value
+          configStore.set(next)
+        } else {
+          const next = {}
+          for (const [field, value] of changes) next[field] = value
+          configStore.set({
+            ...configStore.getSnapshot(),
+            ...next,
+            draftLocale: null,
+            draftSidebar: null,
+            saving: false,
+            saveFailed: false,
+            revision: (configStore.getSnapshot().revision ?? 0) + 1,
+          })
+        }
+      } catch {
+        configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: true })
+      }
     }
 
     exports.apply = apply
-    exports.inject = ['slots', 'workspaces']
+    exports.inject = ['slots', 'workspaces', 'locale', 'settingsScope']
     exports.SettingsPage = SettingsPage
     exports.ArchiveSettingsSection = ArchiveSettingsSection
+    exports.SessionDeleteConfigCard = SessionDeleteConfigCard
+    exports.SidebarTrashAction = SidebarTrashAction
+    exports.LOCALES = LOCALES
+    exports.__configStore = configStore // 测试入口：显式钉住语言/读取快照（不属业务面）
     return module.exports
   },
 })
