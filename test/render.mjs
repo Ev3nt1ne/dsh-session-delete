@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url'
 function resolveReact() {
   const requireHere = createRequire(import.meta.url)
   const anchors = [
+    '/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-ui-trajectory/package.json',
+    '/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/react/package.json',
     '/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-ui-trajectory/package.json',
     '/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/react/package.json',
     '/usr/lib/node_modules/@deepseek-ai/dsh/package.json',
