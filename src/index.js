@@ -123,7 +123,7 @@ function entryStamp() {
 // 插件本体
 // ---------------------------------------------------------------------------
 
-export function apply(ctx) {
+export function apply(ctx, config) {
   /** 缓存的 DSH home（trash 根的父目录）。 */
   let cachedHome = null
 
@@ -738,4 +738,36 @@ export function apply(ctx) {
   // inject 保证 workspaceRegistry/sessionPersistence 在 apply 前完成 init，
   // requireState 此处不会抛 "not started yet"。
   reconcileArchivedGhosts().catch(() => {})
+
+  // 插件配置命名空间（Plugins 设置区与本插件的 locale / sidebarButton 偏好）。
+  // schema 机制沿用 DSH 自身的 settings 服务 + schemastery——与官方 host 插件
+  // dsh-web-search-deepseek 同款 installSection 用法；@deepseek-ai/schemastery
+  // 由 DSH 安装树解析（本插件与 DSH 同目录安装、peer 解析），故按宿主自带
+  // 依赖动态 import，不列入本包 dependencies。
+  // 测试桩 ctx 没有 ctx.inject / settings，直接 apply(ctx) 也就不注册——
+  // 桩环境保持纯文件系统语义。
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['settings'], (settingsCtx) => {
+      import('@deepseek-ai/schemastery')
+        .then(({ default: Schema }) => {
+          const Config = Schema.object({
+            locale: Schema.union(['zh', 'en', 'auto']).default('zh'),
+            sidebarButton: Schema.boolean().default(false),
+          })
+          settingsCtx.settings.installSection(ctx, SETTINGS_NAMESPACE, Config, config ?? {}, {
+            setSource: (source) => {
+              currentConfig = source
+            },
+            onChange: () => {},
+          })
+        })
+        .catch((error) => console.error('[dsh-session-delete] settings namespace 注册失败:', error))
+    })
+  }
 }
+
+/** 本插件设置命名空间（与 client 半 bind 的 namespace 相同）。 */
+export const SETTINGS_NAMESPACE = 'session-delete'
+
+/** 插件当前生效配置（installSection setSource 维护；无 settings 注入时为默认值）。 */
+export let currentConfig = { locale: 'zh', sidebarButton: false }

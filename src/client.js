@@ -370,7 +370,7 @@ window.__ModuleLoader__.load({
     let localeCtx = null // ctx.locale（注入时赋值；缺省时 t 只认显式配置）
     let configScope = null // ctx.settingsScope.bind({ namespace })（注入时绑定）
     const configStore = {
-      snapshot: { locale: 'zh', revision: 0 },
+      snapshot: { locale: 'zh', sidebarButton: false, writable: false, draftLocale: null, draftSidebar: null, saving: false, saveFailed: false, revision: 0 },
       listeners: new Set(),
       getSnapshot() { return this.snapshot },
       set(next) {
@@ -1520,8 +1520,142 @@ window.__ModuleLoader__.load({
     }
 
     // =========================================================================
+    // 插件配置（宿主 settings 命名空间 session-delete 的卡片）
+    // =========================================================================
+
+    /**
+     * Plugins 设置区的本插件配置卡：
+     * - locale：下拉（中文 / English / 跟随应用），生效语言即时切换本插件全部文案；
+     * - sidebarButton：开关（默认关；开启后在侧栏底部注册删除入口）。
+     * 写路径与官方插件卡一致：ctx.settingsScope.bind({ namespace }) + scope.set 字段写入。
+     * 卡片文案用本插件自家 t()（不依赖 slot 系统的 t 注入）。
+     */
+    function SessionDeleteConfigCard(props) {
+      useLocaleTick()
+      const state = props?.useSessionDeleteCard ? props.useSessionDeleteCard((s) => s) : configStore.getSnapshot()
+      if (state == null) return null
+      const writable = state.writable !== false
+      const localeValue = state.draftLocale ?? state.locale ?? 'zh'
+      const sidebarChecked = (state.draftSidebar ?? state.sidebarButton) === true
+      const dirty = state.draftLocale != null || state.draftSidebar != null
+      const saving = state.saving === true
+      const failed = state.saveFailed === true
+
+      function edit(field, value) {
+        const s = { ...configStore.getSnapshot() }
+        if (field === 'locale') s.draftLocale = value
+        else if (field === 'sidebarButton') s.draftSidebar = value
+        configStore.set(s)
+      }
+      function discard() {
+        configStore.set({ ...configStore.getSnapshot(), draftLocale: null, draftSidebar: null, saveFailed: false })
+      }
+      async function save() {
+        const s = { ...configStore.getSnapshot() }
+        const changes = []
+        if (s.draftLocale != null) changes.push(['locale', s.draftLocale])
+        if (s.draftSidebar != null) changes.push(['sidebarButton', s.draftSidebar])
+        if (changes.length === 0) return
+        configStore.set({ ...s, saving: true, saveFailed: false })
+        try {
+          if (configScope) {
+            for (const [field, value] of changes) await configScope.set(field, value)
+          } else {
+            configStore.set({
+              ...configStore.getSnapshot(),
+              locale: changes.some(([f]) => f === 'locale') ? s.draftLocale : configStore.getSnapshot().locale,
+              sidebarButton: changes.some(([f]) => f === 'sidebarButton') ? s.draftSidebar === true : configStore.getSnapshot().sidebarButton,
+              draftLocale: null,
+              draftSidebar: null,
+              saving: false,
+              saveFailed: false,
+            })
+          }
+        } catch {
+          configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: true })
+          return
+        }
+        configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: false })
+      }
+
+      return h(
+        'div',
+        { style: { fontSize: 13, color: T.secondary, width: '100%' } },
+        [
+          !writable ? h('p', { key: 'ro', role: 'status', style: { margin: '0 0 4px' } }, t('card.readOnly')) : null,
+          h('div', { key: 'row1', style: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0', flexWrap: 'wrap' } }, [
+            h('label', { key: 'l', htmlFor: 'sd-cfg-locale', style: { color: T.label, flex: 'none' } }, t('card.locale.label')),
+            h('select', {
+              key: 's',
+              id: 'sd-cfg-locale',
+              style: { ...inputStyle, flex: 'none' },
+              disabled: !writable || saving,
+              value: localeValue,
+              onChange: (e) => (props.edit ? props.edit('locale', e.target.value) : edit('locale', e.target.value)),
+            }, [
+              h('option', { key: 'zh', value: 'zh' }, t('card.locale.zh')),
+              h('option', { key: 'en', value: 'en' }, t('card.locale.en')),
+              h('option', { key: 'auto', value: 'auto' }, t('card.locale.auto')),
+            ]),
+            state.draftLocale != null ? h('span', { key: 'u', style: { fontSize: 12, color: T.warn } }, t('card.unsaved')) : null,
+          ]),
+          h('div', { key: 'row2', style: { display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' } }, [
+            h('input', {
+              key: 'c',
+              id: 'sd-cfg-sidebar',
+              type: 'checkbox',
+              style: { accentColor: T.brand, cursor: 'pointer' },
+              checked: sidebarChecked,
+              disabled: !writable || saving,
+              onChange: (e) => (props.edit ? props.edit('sidebarButton', e.target.checked) : edit('sidebarButton', e.target.checked)),
+            }),
+            h('label', { key: 'l', htmlFor: 'sd-cfg-sidebar', style: { color: T.label, cursor: writable && !saving ? 'pointer' : 'default' } }, t('card.sidebarButton.label')),
+            state.draftSidebar != null ? h('span', { key: 'u', style: { fontSize: 12, color: T.warn } }, t('card.unsaved')) : null,
+          ]),
+          h('p', { key: 'h1', style: { margin: '4px 0 0', lineHeight: '18px' } }, t('card.locale.hint')),
+          h('p', { key: 'h2', style: { margin: '2px 0 0', lineHeight: '18px' } }, t('card.sidebarButton.hint')),
+          (dirty || saving || failed) && writable
+            ? h('div', { key: 'act', style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } }, [
+                failed ? h('span', { key: 'f', role: 'status', style: { color: T.err } }, t('card.saveFailed')) : null,
+                h('button', {
+                  key: 'd',
+                  className: 'sd-btn',
+                  style: smallBtn,
+                  disabled: !dirty || saving,
+                  onClick: () => (props.discard ? props.discard() : discard()),
+                }, t('card.discard')),
+                h('button', {
+                  key: 's',
+                  className: 'sd-btn',
+                  style: { ...smallBtn, borderColor: T.brand, color: T.brand, fontWeight: 600 },
+                  disabled: !dirty || saving,
+                  onClick: () => (props.save ? props.save() : save()),
+                }, saving ? t('card.saving') : t('card.save')),
+              ])
+            : null,
+        ],
+      )
+    }
+
+    // =========================================================================
     // 注册
     // =========================================================================
+
+    /** 把宿主 settingsScope 的解析值流进 configStore（卡片与侧栏共用同一存储）。 */
+    function syncConfigFromScope() {
+      try {
+        const s = configScope.getSnapshot()
+        const resolved = { ...(s.base ?? {}), ...(s.value ?? {}) }
+        configStore.set({
+          locale: resolved.locale ?? 'zh',
+          sidebarButton: resolved.sidebarButton === true,
+          writable: s.writable !== false,
+          revision: (configStore.getSnapshot().revision ?? 0) + 1,
+        })
+      } catch {
+        /* scope 契约外：保持默认 zh/关闭 */
+      }
+    }
 
     /** apply：client 半的注册入口。 */
     function apply(ctx) {
@@ -1535,6 +1669,21 @@ window.__ModuleLoader__.load({
           const d1 = localeCtx.register(LOCALE_NS, 'zh', LOCALES.zh)
           const d2 = localeCtx.register(LOCALE_NS, 'en', LOCALES.en)
           return () => { d1(); d2() }
+        })
+      }
+
+      // 宿主 settings 命名空间（可选注入）：config 流 + 卡片读写共用 configScope
+      try {
+        configScope = ctx.settingsScope?.bind?.({ namespace: 'session-delete' }) ?? null
+      } catch {
+        configScope = null
+      }
+      if (configScope) {
+        ctx.effect(() => {
+          syncConfigFromScope()
+          if (typeof configScope.subscribe !== 'function') return undefined
+          const off = configScope.subscribe(syncConfigFromScope)
+          return off
         })
       }
 
@@ -1599,10 +1748,41 @@ window.__ModuleLoader__.load({
 
     }
 
+    /** 卡片「保存」：草稿字段逐个写入 settings scope；无 scope（离线）就地生效。 */
+    async function saveDraft() {
+      const s = { ...configStore.getSnapshot() }
+      const changes = []
+      if (s.draftLocale != null) changes.push(['locale', s.draftLocale])
+      if (s.draftSidebar != null) changes.push(['sidebarButton', s.draftSidebar])
+      if (changes.length === 0) return
+      configStore.set({ ...s, saving: true, saveFailed: false })
+      try {
+        if (configScope) {
+          for (const [field, value] of changes) await configScope.set(field, value)
+          configStore.set({ ...configStore.getSnapshot(), draftLocale: null, draftSidebar: null, saving: false })
+        } else {
+          const next = {}
+          for (const [field, value] of changes) next[field] = value
+          configStore.set({
+            ...configStore.getSnapshot(),
+            ...next,
+            draftLocale: null,
+            draftSidebar: null,
+            saving: false,
+            saveFailed: false,
+            revision: (configStore.getSnapshot().revision ?? 0) + 1,
+          })
+        }
+      } catch {
+        configStore.set({ ...configStore.getSnapshot(), saving: false, saveFailed: true })
+      }
+    }
+
     exports.apply = apply
-    exports.inject = ['slots', 'workspaces', 'locale']
+    exports.inject = ['slots', 'workspaces', 'locale', 'settingsScope']
     exports.SettingsPage = SettingsPage
     exports.ArchiveSettingsSection = ArchiveSettingsSection
+    exports.SessionDeleteConfigCard = SessionDeleteConfigCard
     exports.LOCALES = LOCALES
     return module.exports
   },
